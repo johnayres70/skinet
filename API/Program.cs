@@ -3,6 +3,7 @@
 //  running our application
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Core.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,9 +24,11 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<StoreContext>(opt =>
 {
     opt.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"));
-}
+});
 
-);
+//jpa add repo services
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+
 // end
 
 // -- jpa - now we build our app
@@ -53,6 +56,24 @@ app.UseAuthorization();
 
 app.MapControllers(); // jpa - will register our api endpoints so app
                       // will know where to send http request.
+
+// jpa - code to migrate database at app.StartUp
+using var scope = app.Services.CreateScope(); // using disposes when finished
+var services = scope.ServiceProvider;
+var context = services.GetRequiredService<StoreContext>();
+var logger = services.GetRequiredService<ILogger<Program>>();
+try
+{
+    // create database if it doesnt already exist
+    await context.Database.MigrateAsync();
+    // seed the database if not already seeded
+    await StoreContextSeed.SeedAsync(context);
+}
+catch (Exception ex)
+{
+
+    logger.LogError(ex, "An error occurred during initial database migration");
+}
 
 app.Run();
 // jpa middleware end

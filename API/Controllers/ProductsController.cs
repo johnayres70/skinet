@@ -1,5 +1,6 @@
 using Infrastructure.Data;
 using Core.Entities;
+using Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace API.Controllers
@@ -8,10 +9,10 @@ namespace API.Controllers
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        private readonly StoreContext _context;
+        private readonly IProductRepository _repo;
 
 
-        public ProductsController(StoreContext context)
+        public ProductsController(IProductRepository repo)
         {
             // jpa - this is constructor dependency injection.
             // When a request comes into our controller, our framework is going to route our
@@ -28,7 +29,7 @@ namespace API.Controllers
             // about memory management and disposing of objects for the mostpart when using
             // dependency injection, the framework will do this for use ... with a few exceptions.
 
-            _context = context;
+            _repo = repo;
         }
 
         // jpa - Async is like a background process in unix.
@@ -38,14 +39,30 @@ namespace API.Controllers
         [HttpGet]
         public async Task<ActionResult<List<Product>>> GetProducts()
         {
-            var products = await _context.Products.ToListAsync();
-            return products;
+            var products = await _repo.GetProductsAsync();
+            return Ok(products);
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            return await _context.Products.FindAsync(id);
+            return await _repo.GetProductByIdAsync(id);
+        }
+
+        [HttpGet("brands")]
+        public async Task<ActionResult<IReadOnlyList<ProductBrand>>> GetProductBrands()
+        {
+            // jpa need to wrap the task in OK() response because dot net core does not allow us to 
+            // directly return an IReadOnlyList
+            return Ok(await _repo.GetProductBrandsAsync());
+        }
+
+        [HttpGet("types")]
+        public async Task<ActionResult<IReadOnlyList<ProductType>>> GetProductTypes()
+        {
+            // jpa need to wrap the task in OK() response because dot net core does not allow us to 
+            // directly return an IReadOnlyList
+            return Ok(await _repo.GetProductTypesAsync());
         }
     }
 }
