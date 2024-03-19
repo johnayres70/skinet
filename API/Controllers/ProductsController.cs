@@ -1,35 +1,34 @@
 using Infrastructure.Data;
 using Core.Entities;
 using Core.Interfaces;
+using Core.Specifications;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using AutoMapper;
+using API.Dtos;
+
 namespace API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        private readonly IProductRepository _repo;
 
+        private readonly IGenericRepository<Product> _productsRepo;
+        private readonly IGenericRepository<ProductBrand> _productBrandRepo;
+        private readonly IGenericRepository<ProductType> _productTypeRepo;
 
-        public ProductsController(IProductRepository repo)
+        private readonly IMapper _mapper;
+
+        public ProductsController(IGenericRepository<Product> productsRepo,
+                                  IGenericRepository<ProductBrand> productBrandRepo,
+                                  IGenericRepository<ProductType> productTypeRepo,
+                                  IMapper mapper)
         {
-            // jpa - this is constructor dependency injection.
-            // When a request comes into our controller, our framework is going to route our
-            // request to our ProductsController and instatiates a new instance of our 
-            // productscontroller. From there it takes a look inside our constructor and it says 
-            // aha I see you need a service, in this case the StoreContext and because our service 
-            // is registered in our program class, program.cs, AddDbContext then it's going
-            // to use this service and class (DbContext) and effectively create a new instance of 
-            // our DbContext that our ProductsController can then use.
-            // And now we have access to all the DbContext methods inside our controller.
-
-            // When our request is finished our  productsController is disposed of along with 
-            // the DbContext StoreContext service, so as developers we dont need to worry
-            // about memory management and disposing of objects for the mostpart when using
-            // dependency injection, the framework will do this for use ... with a few exceptions.
-
-            _repo = repo;
+            _productsRepo = productsRepo;
+            _productBrandRepo = productBrandRepo;
+            _productTypeRepo = productTypeRepo;
+            _mapper = mapper;
         }
 
         // jpa - Async is like a background process in unix.
@@ -37,16 +36,24 @@ namespace API.Controllers
         // notifying the appropriate request on completion and only uses one thread. Makes a big
         // difference with scalability. Current best practice.
         [HttpGet]
-        public async Task<ActionResult<List<Product>>> GetProducts()
+        public async Task<ActionResult<IReadOnlyList<ProductToReturnDto>>> GetProducts()
         {
-            var products = await _repo.GetProductsAsync();
-            return Ok(products);
+            var spec = new ProductsWithTypesAndBrandsSpecification();
+            var products = await _productsRepo.ListAsync(spec);
+
+            return Ok(
+                _mapper.Map<IReadOnlyList<Product>, IReadOnlyList<ProductToReturnDto>>
+                (products)
+            );
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(int id)
+        public async Task<ActionResult<ProductToReturnDto>> GetProduct(int id)
         {
-            return await _repo.GetProductByIdAsync(id);
+            var spec = new ProductsWithTypesAndBrandsSpecification(id);
+            var product = await _productsRepo.GetEntityWithSpec(spec);
+
+            return _mapper.Map<Product, ProductToReturnDto>(product);
         }
 
         [HttpGet("brands")]
@@ -54,7 +61,7 @@ namespace API.Controllers
         {
             // jpa need to wrap the task in OK() response because dot net core does not allow us to 
             // directly return an IReadOnlyList
-            return Ok(await _repo.GetProductBrandsAsync());
+            return Ok(await _productBrandRepo.ListAllAsync());
         }
 
         [HttpGet("types")]
@@ -62,7 +69,7 @@ namespace API.Controllers
         {
             // jpa need to wrap the task in OK() response because dot net core does not allow us to 
             // directly return an IReadOnlyList
-            return Ok(await _repo.GetProductTypesAsync());
+            return Ok(await _productTypeRepo.ListAllAsync());
         }
     }
 }

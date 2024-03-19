@@ -28,6 +28,9 @@ builder.Services.AddDbContext<StoreContext>(opt =>
 
 //jpa add repo services
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+// jpa add automapper services
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 // end
 
@@ -51,6 +54,8 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection(); 
 // jpa removed because will cause warning in our app
+
+app.UseStaticFiles();
 
 app.UseAuthorization();
 
