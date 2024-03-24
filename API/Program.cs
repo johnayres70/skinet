@@ -4,6 +4,11 @@
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Core.Interfaces;
+using API.Middleware;
+using Microsoft.AspNetCore.Mvc;
+using API.Errors;
+using API.Extensions;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,27 +22,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // jpa -minimal api start
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-builder.Services.AddDbContext<StoreContext>(opt =>
-{
-    opt.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
-
-//jpa add repo services
-builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-// jpa add automapper services
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-
-// end
+builder.Services.AddApplicationServices(builder.Configuration);
 
 // -- jpa - now we build our app
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
 // jpa - as a request comes in think of it as going thru a
 // pipeline or tunnel on it's journey into and out of the api
 // the request can be manipulated. What we have here is effectively
@@ -46,16 +37,21 @@ var app = builder.Build();
 // of the pipeline
 
 // jpa midleware start
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+
+// implement error handling middleware first
+app.UseMiddleware<ExceptionMiddleware>();
+app.UseStatusCodePagesWithReExecute("/errors/{0}");
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 // app.UseHttpsRedirection(); 
 // jpa removed because will cause warning in our app
 
 app.UseStaticFiles();
+
+app.UseCors("CorsPolicy");
 
 app.UseAuthorization();
 

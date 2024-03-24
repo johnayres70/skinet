@@ -6,12 +6,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
 using API.Dtos;
+using Microsoft.AspNetCore.Http;
+using API.Errors;
+using API.Helpers;
 
 namespace API.Controllers
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class ProductsController : ControllerBase
+
+    public class ProductsController : BaseApiController
     {
 
         private readonly IGenericRepository<Product> _productsRepo;
@@ -35,19 +37,26 @@ namespace API.Controllers
         // it puts th current request on the stack and then puts the next request on the stack
         // notifying the appropriate request on completion and only uses one thread. Makes a big
         // difference with scalability. Current best practice.
+
         [HttpGet]
-        public async Task<ActionResult<IReadOnlyList<ProductToReturnDto>>> GetProducts()
+        public async Task<ActionResult<Pagination<ProductToReturnDto>>> GetProducts(
+        [FromQuery] ProductSpecParams productParams)
         {
-            var spec = new ProductsWithTypesAndBrandsSpecification();
+            var spec = new ProductsWithTypesAndBrandsSpecification(productParams);
+            var countSpec = new ProductsWithFiltersForCountSpecification(productParams);
+
+            var totalItems = await _productsRepo.CountAsync(countSpec);
             var products = await _productsRepo.ListAsync(spec);
 
-            return Ok(
-                _mapper.Map<IReadOnlyList<Product>, IReadOnlyList<ProductToReturnDto>>
-                (products)
-            );
+            var data = _mapper.Map<IReadOnlyList<ProductToReturnDto>>(products);
+
+            return Ok(new Pagination<ProductToReturnDto>(productParams.PageIndex,
+                productParams.PageSize, totalItems, data));
         }
 
         [HttpGet("{id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)] //swagger info
+        [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
         public async Task<ActionResult<ProductToReturnDto>> GetProduct(int id)
         {
             var spec = new ProductsWithTypesAndBrandsSpecification(id);
